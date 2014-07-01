@@ -8,7 +8,7 @@
 using namespace std;
 
 #define BLOCK_SIZE (4*1024*1024)
-const int HASH_OUTPUT_SIZE = 160;
+const int HASH_OUTPUT_SIZE = 20;
 
 int main(int argc, char* argv[]) {
 	FILE* 	pFile;
@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 	string	oFileName;
 	int 	blocks_num;
 
-  	char* 	buffer;
+  	unsigned char* 	buffer;
 	
 	// get avi file name
 	if (argc < 2) {
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 	} else {
 		pFileName = argv[1];
 		pFileName += ".avi";
-		oFileName = argv[1];
+		oFileName = argv[2];
 		oFileName += ".torrent";
 	}
 
@@ -50,28 +50,30 @@ int main(int argc, char* argv[]) {
 	fprintf (oFile, "%ld\n", pFileSize);
 	
 	// allocate memory to contain segment:
-  	buffer = (char*) malloc (BLOCK_SIZE);
+  	buffer = (unsigned char*) malloc (BLOCK_SIZE);
 	if (buffer == NULL) {
-		cerr << "Memory error" << endl; 
+		cerr << "Memory error" << endl;
 		exit (3);
 	}
 
 	// partition and hash
 	blocks_num = ceil((float)pFileSize/BLOCK_SIZE);
 	fprintf (oFile, "%i\n", blocks_num);
-	char hash_value[HASH_OUTPUT_SIZE];
-
+	unsigned char hash_value[HASH_OUTPUT_SIZE];
+    
 	for(int i = 0; i < blocks_num; i++) {
 		if (pFileSize%BLOCK_SIZE==0) {
 			fread(buffer, 1, BLOCK_SIZE, pFile);
 		} else {
 			fread(buffer, 1, pFileSize%BLOCK_SIZE, pFile);
 		}
-		hash_func(buffer);
-	}	
+		//printf("%s\n", buffer);
+		SHA1(buffer, BLOCK_SIZE, hash_value);		
+		fprintf(oFile, "%s\n", hash_value);
+	}
 	
 	fclose(pFile);
 	fclose(oFile);
 	free(buffer);
-	return 0;	
+	return 0;
 }
