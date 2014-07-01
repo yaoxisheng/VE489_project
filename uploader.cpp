@@ -3,9 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <openssl/sha.h>
+
 using namespace std;
 
 #define BLOCK_SIZE (4*1024*1024)
+const int HASH_OUTPUT_SIZE = 160;
 
 int main(int argc, char* argv[]) {
 	FILE* 	pFile;
@@ -26,7 +29,7 @@ int main(int argc, char* argv[]) {
 		pFileName = argv[1];
 		pFileName += ".avi";
 		oFileName = argv[1];
-		oFileName += ".torrent"; 
+		oFileName += ".torrent";
 	}
 
 	// open file
@@ -56,6 +59,7 @@ int main(int argc, char* argv[]) {
 	// partition and hash
 	blocks_num = ceil((float)pFileSize/BLOCK_SIZE);
 	fprintf (oFile, "%i\n", blocks_num);
+	char hash_value[HASH_OUTPUT_SIZE];
 
 	for(int i = 0; i < blocks_num; i++) {
 		if (pFileSize%BLOCK_SIZE==0) {
@@ -63,7 +67,7 @@ int main(int argc, char* argv[]) {
 		} else {
 			fread(buffer, 1, pFileSize%BLOCK_SIZE, pFile);
 		}
-		//hash_func(buffer);
+		hash_func(buffer);
 	}	
 	
 	fclose(pFile);
