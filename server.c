@@ -12,10 +12,26 @@
 
 #define MAXLINE 4096
 
+void pulishTorrent(int connfd) {
+	printf("receiving torrent\n");	
+
+	int n, fileSize; 
+	
+	// recv torrent file   
+	n = recv(connfd, &fileSize, sizeof(int), 0);
+    printf("receive file size:%i\n", fileSize);   
+
+	char* buff = (char*) malloc (fileSize);    
+	n = recv(connfd, buff, fileSize, 0);
+    printf("receive file contents:\n%s", buff);	
+
+	free(buff);
+}
+
 int main(int argc, char* argv[]) {
     int listenfd, connfd;
     struct sockaddr_in servaddr;
-    char buff[4096];
+    char buff;
     int n;
     
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -43,10 +59,14 @@ int main(int argc, char* argv[]) {
             printf("accept error\n");
             continue;
         }
-    
-        n = recv(connfd, buff, MAXLINE, 0);
-        buff[n] = '\0';
-        printf("%s\n", buff);
+
+        n = recv(connfd, &buff, sizeof(char), 0);
+        printf("request command:%c\n", buff);
+		
+		if (buff == 'p') {
+			pulishTorrent(connfd);
+		}
+	
         close(connfd);
     }
     

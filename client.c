@@ -9,10 +9,12 @@
 #include<stdlib.h>
 #include<memory.h>
 #include<stdio.h>
+#include "client.h"
 
-int main(int argc, char* argv[]) {
-    int sockfd, n;
-    char sendline[4096], recvline[4096];
+int connectToServer(char* serverIP) {
+	printf("connecting to server\n");
+
+	int sockfd;
     struct sockaddr_in servaddr;
        
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -22,9 +24,9 @@ int main(int argc, char* argv[]) {
     
     memset(&servaddr, 0 ,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(6666);
-    
-    if (inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0) {
+    servaddr.sin_port = htons(6666);	
+
+    if (inet_pton(AF_INET, serverIP, &servaddr.sin_addr) <= 0) {
         printf("inet_pton error\n");
         exit(0);
     }
@@ -33,13 +35,45 @@ int main(int argc, char* argv[]) {
         printf("connect error\n");
         exit(0);
     }
-    printf("please enter:\n");
-    fgets(sendline, 4096, stdin);
-    if (send(sockfd, sendline, strlen(sendline), 0) < 0) {
-        printf("send error\n");
+
+	return sockfd;
+}
+
+void disconnectToServer(int sockfd) {
+	printf("disconnecting from server\n");
+
+	close(sockfd);
+	return;
+}
+
+void publishTorrent(int sockfd, FILE* oFile) {
+	printf("publishing torrent\n");
+
+	// send request
+	char request = 'p';
+    if (send(sockfd, &request, sizeof(char), 0) < 0) {
+        printf("send request error\n");
         exit(0);
     }
 
-    close(sockfd);
-    exit(0);
+	// send torrent file
+  	fseek (oFile, 0, SEEK_END);
+  	int oFileSize = ftell (oFile);
+	if (send(sockfd, &oFileSize, sizeof(int), 0) < 0) {
+        printf("send file size error\n");
+        exit(0);
+    }
+
+	rewind (oFile);
+	char* buffer = (char*) malloc (oFileSize);
+	fread(buffer, 1, oFileSize, oFile);
+    if (send(sockfd, buffer, oFileSize, 0) < 0) {
+        printf("send file error\n");
+        exit(0);
+    }		
+	free(buffer);
+
+	// send port ??
+
+	return;
 }

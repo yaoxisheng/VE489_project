@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <openssl/sha.h>
+#include "client.h"
 
 using namespace std;
+
+// ./uploader aviFileName torrentFileName serverIP
 
 #define BLOCK_SIZE (4*1024*1024)
 const int HASH_OUTPUT_SIZE = 20;
@@ -21,7 +24,7 @@ int main(int argc, char* argv[]) {
 
   	unsigned char* 	buffer;
 	
-	// get avi file name
+	// get file name
 	if (argc < 2) {
 		cerr << "no file name entered" << endl;
 		exit(1);
@@ -32,11 +35,17 @@ int main(int argc, char* argv[]) {
 		oFileName += ".torrent";
 	}
 
+	// check server IP
+	if (argc < 3) {
+		cerr << "no server IP entered" << endl;
+		exit(2);	
+	}
+
 	// open file
-  	pFile = fopen(pFileName.c_str(), "r");
+  	pFile = fopen(pFileName.c_str(), "rb");
   	if (pFile==NULL) {
 		cerr << "fail to open avi file" << endl; 
-		exit (2);
+		exit (3);
 	}
 
   	// obtain file size in bytes;
@@ -45,7 +54,7 @@ int main(int argc, char* argv[]) {
   	rewind (pFile);
 
 	//write header
-	oFile = fopen(oFileName.c_str(), "w");
+	oFile = fopen(oFileName.c_str(), "wb");
 	fprintf (oFile, "%s\n", pFileName.c_str());
 	fprintf (oFile, "%ld\n", pFileSize);
 	
@@ -53,7 +62,7 @@ int main(int argc, char* argv[]) {
   	buffer = (unsigned char*) malloc (BLOCK_SIZE);
 	if (buffer == NULL) {
 		cerr << "Memory error" << endl;
-		exit (3);
+		exit (4);
 	}
 
 	// partition and hash
@@ -67,13 +76,24 @@ int main(int argc, char* argv[]) {
 		} else {
 			fread(buffer, 1, pFileSize%BLOCK_SIZE, pFile);
 		}
-		//printf("%s\n", buffer);
-		SHA1(buffer, BLOCK_SIZE, hash_value);		
-		fprintf(oFile, "%s\n", hash_value);
+		SHA1(buffer, BLOCK_SIZE, hash_value);
+
+		for (int j = 0; j < 20; j++) {
+			fprintf(oFile, "%02x" , hash_value[j]);
+		}		
+		fprintf(oFile, "\n");
 	}
-	
+
 	fclose(pFile);
 	fclose(oFile);
 	free(buffer);
+
+	// publish torrent to server
+	oFile = fopen (oFileName.c_str(), "rb");
+	int sockfd = connectToServer(argv[3]);	
+	publishTorrent(sockfd, oFile);
+	disconnectToServer(sockfd);
+	fclose(oFile);
+
 	return 0;
 }
