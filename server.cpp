@@ -12,14 +12,14 @@
 
 #define MAXLINE 4096
 
-void pulishTorrent(int connfd) {
-	printf("receiving torrent\n");	
+void receiveTorrent(int connfd) {
+	printf("receiving torrent\n");
 
 	int n, fileSize; 
 	
 	// recv torrent file   
 	n = recv(connfd, &fileSize, sizeof(int), 0);
-    printf("receive file size:%i\n", fileSize);   
+    printf("receive file size: %i\n", fileSize);   
 
 	char* buff = (char*) malloc (fileSize);    
 	n = recv(connfd, buff, fileSize, 0);
@@ -61,10 +61,10 @@ int main(int argc, char* argv[]) {
         }
 
         n = recv(connfd, &buff, sizeof(char), 0);
-        printf("request command:%c\n", buff);
+        printf("request command: %c\n", buff);
 		
 		if (buff == 'p') {
-			pulishTorrent(connfd);
+			receiveTorrent(connfd);
 		}
 	
         close(connfd);

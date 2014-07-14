@@ -10,7 +10,7 @@ using namespace std;
 
 // ./uploader aviFileName torrentFileName serverIP
 
-#define BLOCK_SIZE (4*1024*1024)
+const int BLOCK_SIZE = 4*1024*1024;
 const int HASH_OUTPUT_SIZE = 20;
 
 int main(int argc, char* argv[]) {
