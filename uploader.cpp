@@ -1,8 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
 #include <openssl/sha.h>
 
 using namespace std;
@@ -26,10 +26,8 @@ int main(int argc, char* argv[]) {
 		cerr << "no file name entered" << endl;
 		exit(1);
 	} else {
-		pFileName = argv[1];
-		pFileName += ".avi";
-		oFileName = argv[2];
-		oFileName += ".torrent";
+		pFileName = argv[1];		
+		oFileName = argv[2];		
 	}
 
 	// open file
@@ -40,7 +38,7 @@ int main(int argc, char* argv[]) {
 	}
 
   	// obtain file size in bytes;
-  	fseek (pFile, 0, SEEK_END);
+  	fseek(pFile, 0, SEEK_END);
   	pFileSize = ftell (pFile);
   	rewind (pFile);
 
@@ -59,17 +57,20 @@ int main(int argc, char* argv[]) {
 	// partition and hash
 	blocks_num = ceil((float)pFileSize/BLOCK_SIZE);
 	fprintf (oFile, "%i\n", blocks_num);
-	unsigned char hash_value[HASH_OUTPUT_SIZE];
-    
+	
+	unsigned char hash_value[HASH_OUTPUT_SIZE];    
 	for(int i = 0; i < blocks_num; i++) {
 		if (pFileSize%BLOCK_SIZE==0) {
 			fread(buffer, 1, BLOCK_SIZE, pFile);
 		} else {
 			fread(buffer, 1, pFileSize%BLOCK_SIZE, pFile);
 		}
-		//printf("%s\n", buffer);
+		
 		SHA1(buffer, BLOCK_SIZE, hash_value);		
-		fprintf(oFile, "%s\n", hash_value);
+		for (int j = 0; j < HASH_OUTPUT_SIZE; j++) {
+		    fprintf(oFile, "%x", hash_value[j]);
+		}
+		fprintf(oFile, "\n");		
 	}
 	
 	fclose(pFile);

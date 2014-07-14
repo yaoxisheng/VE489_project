@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
     
         n = recv(connfd, buff, MAXLINE, 0);
         buff[n] = '\0';
-        printf("%s\n", buff);
+        printf("%s", buff);
         close(connfd);
     }
     
