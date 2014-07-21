@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
     if (bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) {
         printf("bind error\n");
         exit(0);
-    }    
+    }
     
     if (listen(listenfd, 10) < 0) {
         printf("listen error\n");
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
     FILE* oFile;
     
     while (1) {
-        if ((connfd = accept(listenfd, (struct sockaddr*)&clientAddr, &addrlen)) == -1) {            
+        if ((connfd = accept(listenfd, (struct sockaddr*)&clientAddr, &addrlen)) == -1) {
             printf("accept error\n");
             continue;
         }
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
         close(connfd);
     }
     
-    close(listenfd);    
+    close(listenfd);
     return 0;
 }
 
@@ -81,22 +81,33 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	int n, fileSize;
 	unsigned char hash_value[20];
 	
-	// recv torrent file   
+	// recv torrent file
 	n = recv(connfd, &fileSize, sizeof(int), 0);
-    printf("receive file size: %i\n", fileSize);   
+    printf("receive file size: %i\n", fileSize);
 
-	char* buff = (char*) malloc (fileSize);	
+	char* buff = (char*) malloc (fileSize);
 	n = recv(connfd, buff, fileSize, 0);
-    printf("receive filex contents:\n%s", buff);
+    printf("receive file contents:\n%s", buff);
     
     // hash torrent file 
-    unsigned char* buff2 = (unsigned char*) malloc(fileSize);
-	memcpy(buff2,buff,fileSize);
+    unsigned char* buff2 = (unsigned char *) malloc(fileSize);
+	memcpy(buff2, buff, fileSize);
     SHA1(buff2, fileSize, hash_value);
     for (int i = 0; i < 20; i++) {
 		fprintf(oFile, "%02x" , hash_value[i]);
 	}		
 	fprintf(oFile, "\n");
 
+    // write torrent name to file
+    FILE *oFile2;
+    char *endline;
+    oFile2 = fopen("torrent_list", "w");
+    endline = strchr(buff, '\n');    
+    char* buff3 = (char *) malloc(endline - buff);
+    strncpy(buff3, buff, endline - buff);
+    fprintf(oFile2, "%s\n", buff3);
+    
+    fclose(oFile2);
+    free(buff3); 
 	free(buff);
 }
