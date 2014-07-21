@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
         
-        oFile = fopen("peer_list","w");
+        oFile = fopen("peer_list","a");
         ip_str = string(inet_ntoa(clientAddr.sin_addr));
         fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
        
@@ -85,9 +85,10 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	n = recv(connfd, &fileSize, sizeof(int), 0);
     printf("receive file size: %i\n", fileSize);
 
-	char* buff = (char*) malloc (fileSize);
+	char* buff = (char*) malloc (fileSize + 1);
 	n = recv(connfd, buff, fileSize, 0);
-    printf("receive file contents:\n%s", buff);
+	buff[fileSize] = '\0';
+    //printf("receive file contents:\n%s", buff);
     
     // hash torrent file 
     unsigned char* buff2 = (unsigned char *) malloc(fileSize);
@@ -98,23 +99,26 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	}		
 	fprintf(oFile, "\n");
 
-    // save torrent file name
-    FILE *oFile2;
+    // save torrent file name    
+    FILE *oFile2;    
     char *c_ptr;
-    oFile2 = fopen("torrent_list", "w");
+    oFile2 = fopen("torrent_list", "a");
     c_ptr = strchr(buff, '.');    
-    char* torrentName = (char *) malloc(c_ptr - buff);    
-    strncpy(torrentName, buff, c_ptr - buff);
-    string torrentNameStr = string(torrentName) + ".torrent";
-    fprintf(oFile2, "%s\n", torrentNameStr.c_str());
+    char *torrentName = (char *) malloc(c_ptr - buff + 1);
+    memcpy(torrentName, buff, c_ptr - buff);
+    torrentName[c_ptr - buff] = '\0';
+    string torrentNameStr(torrentName);
+    torrentNameStr += ".torrent";
+    fprintf(oFile2, "%s\n", torrentNameStr.c_str());    
     
     // save torrent file
     FILE *oFile3;
     oFile3 = fopen(torrentNameStr.c_str(), "w");
     fprintf(oFile3, "%s", buff);
-    
-    fclose(oFile3);
+        
     fclose(oFile2);
+    fclose(oFile3);
     free(torrentName); 
 	free(buff);
+	free(buff2);
 }
