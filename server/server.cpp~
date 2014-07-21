@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
         
-        oFile = fopen("peer_list","a");
+        oFile = fopen("peer_list","w");
         ip_str = string(inet_ntoa(clientAddr.sin_addr));
         fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
        
@@ -66,8 +66,6 @@ int main(int argc, char* argv[]) {
 		
 		if (buff == 'p') {
 			receiveTorrent(connfd, oFile);
-		} else if (buff== 'd') {
-			giveAllTorrents(connfd);		
 		}
 		fclose(oFile);
 	
@@ -88,10 +86,9 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	n = recv(connfd, &fileSize, sizeof(int), 0);
     printf("receive file size: %i\n", fileSize);
 
-	char* buff = (char*) malloc (fileSize + 1);
+	char* buff = (char*) malloc (fileSize);
 	n = recv(connfd, buff, fileSize, 0);
-	buff[fileSize] = '\0';
-    //printf("receive file contents:\n%s", buff);
+    printf("receive file contents:\n%s", buff);
     
     // hash torrent file 
     unsigned char* buff2 = (unsigned char *) malloc(fileSize);
@@ -102,28 +99,25 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	}		
 	fprintf(oFile, "\n");
 
-    // save torrent file name    
-    FILE *oFile2;    
+    // save torrent file name
+    FILE *oFile2;
     char *c_ptr;
-    oFile2 = fopen("torrent_list", "a");
+    oFile2 = fopen("torrent_list", "w");
     c_ptr = strchr(buff, '.');    
-    char *torrentName = (char *) malloc(c_ptr - buff + 1);
-    memcpy(torrentName, buff, c_ptr - buff);
-    torrentName[c_ptr - buff] = '\0';
-    string torrentNameStr(torrentName);
-    torrentNameStr += ".torrent";
-    fprintf(oFile2, "%s\n", torrentNameStr.c_str());    
+    char* torrentName = (char *) malloc(c_ptr - buff);    
+    strncpy(torrentName, buff, c_ptr - buff);
+    string torrentNameStr = string(torrentName) + ".torrent";
+    fprintf(oFile2, "%s\n", torrentNameStr.c_str());
     
     // save torrent file
     FILE *oFile3;
     oFile3 = fopen(torrentNameStr.c_str(), "w");
     fprintf(oFile3, "%s", buff);
-        
-    fclose(oFile2);
+    
     fclose(oFile3);
+    fclose(oFile2);
     free(torrentName); 
 	free(buff);
-	free(buff2);
 }
 
 void giveAllTorrents(int connfd) {
