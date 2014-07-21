@@ -38,6 +38,7 @@ void giveAllTorrents(int connfd) {
 	file = fopen("torrent_list", "rb");
   	fseek (file, 0, SEEK_END);
   	fileSize = ftell (file);
+	printf("%i\n", fileSize);
 	if (send(connfd, &fileSize, sizeof(int), 0) < 0) {
         printf("send file size error\n");
         exit(0);
