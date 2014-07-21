@@ -98,16 +98,23 @@ void receiveTorrent(int connfd, FILE* oFile) {
 	}		
 	fprintf(oFile, "\n");
 
-    // write torrent name to file
+    // save torrent file name
     FILE *oFile2;
-    char *endline;
+    char *c_ptr;
     oFile2 = fopen("torrent_list", "w");
-    endline = strchr(buff, '\n');    
-    char* buff3 = (char *) malloc(endline - buff);
-    strncpy(buff3, buff, endline - buff);
-    fprintf(oFile2, "%s\n", buff3);
+    c_ptr = strchr(buff, '.');    
+    char* torrentName = (char *) malloc(c_ptr - buff);    
+    strncpy(torrentName, buff, c_ptr - buff);
+    string torrentNameStr = string(torrentName) + ".torrent";
+    fprintf(oFile2, "%s\n", torrentNameStr.c_str());
     
+    // save torrent file
+    FILE *oFile3;
+    oFile3 = fopen(torrentNameStr.c_str(), "w");
+    fprintf(oFile3, "%s", buff);
+    
+    fclose(oFile3);
     fclose(oFile2);
-    free(buff3); 
+    free(torrentName); 
 	free(buff);
 }
