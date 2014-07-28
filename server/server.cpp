@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
+#include <fstream>
 #include <openssl/sha.h>
 
 #define MAXLINE 4096
@@ -19,6 +20,9 @@ using namespace std;
 
 void receiveTorrent(int connfd, FILE* oFile);
 void giveAllTorrents(int connfd);
+void sendTorrent(int connfd);
+void publishTorrent(int sockfd, FILE* oFile);
+void send_ip_port(int sockfd, string &hashValue);
 
 int main(int argc, char* argv[]) {
     int listenfd, connfd;
@@ -59,15 +63,23 @@ int main(int argc, char* argv[]) {
         
         oFile = fopen("peer_list","a");
         ip_str = string(inet_ntoa(clientAddr.sin_addr));
-        fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
+        //fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
        
         n = recv(connfd, &buff, sizeof(char), 0);
         printf("request command: %c\n", buff);
 		
 		if (buff == 'p') {
 			receiveTorrent(connfd, oFile);
+			//oFile = fopen("peer_list","a");
+        	//ip_str = string(inet_ntoa(clientAddr.sin_addr));
+        	fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
 		} else if (buff== 'd') {
-			giveAllTorrents(connfd);		
+			string hashValue;
+			giveAllTorrents(connfd);
+			sendTorrent(connfd);
+			send_ip_port(connfd, hashValue);
+			fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
+			fprintf(oFile, "%s\n", hashValue.c_str());
 		}
 		fclose(oFile);
 	
@@ -144,9 +156,117 @@ void giveAllTorrents(int connfd) {
 	rewind (file);
 	char* buffer = (char*) malloc (fileSize);
 	fread(buffer, 1, fileSize, file);
-    if (send(connfd, buffer, fileSize, 0) < 0) {
-        printf("send file error\n");
-        exit(0);
+    	if (send(connfd, buffer, fileSize, 0) < 0) {
+        	printf("send file error\n");
+        	exit(0);
+    	}		
+	free(buffer);
+}
+
+void sendTorrent(int connfd){
+	printf("send torrent file to client\n");
+	int string_size;
+	int n;
+	n = recv(connfd, &string_size, sizeof(int), 0);
+	char * torrent_name = new char[string_size+1];
+	n = recv(connfd, torrent_name, size_t(string_size), 0);
+	torrent_name[string_size] = '\0';
+	printf("torrent name is %s\n", torrent_name);
+	
+	//publish torrent to downloader
+	FILE* 	oFile;
+
+	oFile = fopen (torrent_name, "rb");	
+	publishTorrent(connfd, oFile);
+	fclose(oFile);
+	delete torrent_name;
+
+	
+}
+void publishTorrent(int sockfd, FILE* oFile) {
+	printf("publishing torrent\n");
+
+	// send torrent file
+  	fseek (oFile, 0, SEEK_END);
+  	int oFileSize = ftell (oFile);
+	if (send(sockfd, &oFileSize, sizeof(int), 0) < 0) {
+		printf("send file size error\n");
+		exit(0);
+    }
+
+	rewind (oFile);
+	char* buffer = (char*) malloc (oFileSize);
+	fread(buffer, 1, oFileSize, oFile);
+   	if (send(sockfd, buffer, oFileSize, 0) < 0) {
+		printf("send file error\n");
+		exit(0);
     }		
 	free(buffer);
+}
+void send_ip_port(int sockfd, string &hashValue){
+	printf("recv hash value from downloader\n");
+	int n;
+	unsigned char * hash_value = new unsigned char[20];
+	n = recv(sockfd, hash_value, 20, 0);
+	printf("The receiving hash value is: \n");
+	//string hashValue;	
+	for (int i = 0; i < 20; i++) {
+		char temp[2];
+		sprintf (temp, "%02x", hash_value[i]);
+		//printf("%02x" , hash_value[i]);
+		hashValue = hashValue + temp[0] + temp[1];
+	}
+	printf("The hash value is %s\n", hashValue.c_str());
+	ifstream peer_list;
+	peer_list.open("peer_list");
+	cout<<"print peer_list content"<<endl;
+	if(!peer_list.is_open()){
+		cout<<"Cannot Open File peer_list"<<endl;
+		exit(1);	
+	}
+	string ip;
+	unsigned int port;
+	string hash_id;
+	char flag;
+	while(peer_list>>ip){		
+		peer_list>>port;
+		peer_list>>hash_id;	
+		if(hashValue == hash_id){			
+			flag = 'r';
+			if(send(sockfd, &flag, sizeof(char), 0) < 0){
+				printf("send file error\n");
+				exit(0);			
+			}			
+			cout<<"ip is "<<ip<<endl;
+			cout<<"port is "<<port<<endl;
+			unsigned int size = ip.size();			
+			if(send(sockfd, &size, sizeof(int), 0) < 0){
+				printf("send file error\n");
+				exit(0);			
+			}		
+			if (send(sockfd, ip.c_str(), ip.size(), 0) < 0) {
+				printf("send file error\n");
+				exit(0);
+    		}
+			if (send(sockfd, &port, sizeof(int), 0) < 0) {
+				printf("send file error\n");
+				exit(0);
+    		}				
+		}else{
+			flag = 'w';
+			if(send(sockfd, &flag, sizeof(char), 0) < 0){
+				printf("send file error\n");
+				exit(0);			
+			}			
+		}	
+	}
+	flag = 'e';
+	if(send(sockfd, &flag, sizeof(char), 0) < 0){
+				printf("send file error\n");
+				exit(0);			
+	}	
+	peer_list.close();
+	
+		
+	
 }
