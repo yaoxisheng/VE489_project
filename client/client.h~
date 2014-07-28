@@ -2,7 +2,7 @@
 #define _CLIENT_H
 
 // return sockfd
-int connectToServer(char* serverIP, int port);
+int connectToServer(char* serverIP);
 
 void disconnectToServer(int sockfd);
 

@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 		exit(2);	
 	}	
 	// publish torrent to server
-	int sockfd = connectToServer(argv[1]);	
+	int sockfd = connectToServer(argv[1],6666);	
 	char request = 'd';
 	char *buff;
 	int n, torrent_file_size;	
@@ -97,6 +97,7 @@ int main(int argc, char* argv[]) {
 	}
 	char flag = 'w';
 	while(flag != 'e'){
+		printf("jinlaile\n");
 		n = recv(sockfd, &flag, sizeof(char), 0);
 		if(flag == 'r'){
 			n = recv(sockfd, &fileSize, sizeof(int), 0);
@@ -105,7 +106,8 @@ int main(int argc, char* argv[]) {
 			int port;
 			n = recv(sockfd, &port, sizeof(int), 0);
 			ip[fileSize] = '\0';
-			printf("size is %i, ip is %s, port is %i\n",fileSize,ip, port);
+			printf("size is %i, ip is %s, port is %i\n",fileSize,ip, port);			
+			connectToServer(ip, port);			
 			free(ip);		
 		}
 	}	

@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
 
 	// publish torrent to server
 	oFile = fopen (oFileName.c_str(), "rb");
-	int sockfd = connectToServer(argv[3]);	
+	int sockfd = connectToServer(argv[3], 6666);	
 	publishTorrent(sockfd, oFile);
 	disconnectToServer(sockfd);
 	fclose(oFile);

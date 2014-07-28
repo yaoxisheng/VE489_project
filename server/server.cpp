@@ -69,10 +69,9 @@ int main(int argc, char* argv[]) {
         printf("request command: %c\n", buff);
 		
 		if (buff == 'p') {
+			fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");			
 			receiveTorrent(connfd, oFile);
-			//oFile = fopen("peer_list","a");
-        	//ip_str = string(inet_ntoa(clientAddr.sin_addr));
-        	fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
+        	//fprintf(oFile, "%s %s ", ip_str.c_str(), "6881");
 		} else if (buff== 'd') {
 			string hashValue;
 			giveAllTorrents(connfd);

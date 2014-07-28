@@ -11,7 +11,7 @@
 #include<stdio.h>
 #include "client.h"
 
-int connectToServer(char* serverIP, int port) {
+int connectToServer(char* serverIP) {
 	printf("connecting to server\n");
 
 	int sockfd;
@@ -24,7 +24,7 @@ int connectToServer(char* serverIP, int port) {
     
     memset(&servaddr, 0 ,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);	
+    servaddr.sin_port = htons(6666);	
 
     if (inet_pton(AF_INET, serverIP, &servaddr.sin_addr) <= 0) {
         printf("inet_pton error\n");
