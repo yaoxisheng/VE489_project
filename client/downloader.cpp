@@ -25,8 +25,7 @@ int main(int argc, char* argv[]) {
 	string	oFileName;
 	int 	blocks_num;
 
-  	unsigned char* 	buffer;
-	
+  	unsigned char* 	buffer;	
 
 	// check server IP
 	if (argc < 2) {
@@ -70,26 +69,26 @@ int main(int argc, char* argv[]) {
 	//receive size	
 	int fileSize;
 	n = recv(sockfd, &fileSize, sizeof(int), 0);
-    	printf("receive file size: %i\n", fileSize);
+	printf("receive file size: %i\n", fileSize);
 	//recv file
 	char* torrent_buff = (char*) malloc (fileSize + 1);
 	n = recv(sockfd, torrent_buff, fileSize, 0);
 	torrent_buff[fileSize] = '\0';
 	//write torrent file
 	FILE *oFile3;
-    	oFile3 = fopen(input, "w");
-    	fprintf(oFile3, "%s", torrent_buff);
+	oFile3 = fopen(input, "w");
+	fprintf(oFile3, "%s", torrent_buff);
 	//hash torrent	
 	unsigned char* buff2 = (unsigned char *) malloc(fileSize);
 	memcpy(buff2, torrent_buff, fileSize);
 	unsigned char hash_value[20];
-    	SHA1(buff2, fileSize, hash_value);
+	SHA1(buff2, fileSize, hash_value);
 	free(buff2);
 	free(torrent_buff);
 	
-    	for (int i = 0; i < 20; i++) {
-		printf("%02x" , hash_value[i]);
-	}
+    for (int i = 0; i < 20; i++) {
+	    printf("%02x" , hash_value[i]);
+    }
 	printf("\n");
 	if(send(sockfd, hash_value, 20, 0) < 0){
 		printf("send request error\n");

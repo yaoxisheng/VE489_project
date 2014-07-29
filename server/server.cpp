@@ -178,10 +178,9 @@ void sendTorrent(int connfd){
 	oFile = fopen (torrent_name, "rb");	
 	publishTorrent(connfd, oFile);
 	fclose(oFile);
-	delete torrent_name;
-
-	
+	delete torrent_name;	
 }
+
 void publishTorrent(int sockfd, FILE* oFile) {
 	printf("publishing torrent\n");
 
@@ -210,7 +209,7 @@ void send_ip_port(int sockfd, string &hashValue){
 	printf("The receiving hash value is: \n");
 	//string hashValue;	
 	for (int i = 0; i < 20; i++) {
-		char temp[2];
+		char temp[3];
 		sprintf (temp, "%02x", hash_value[i]);
 		//printf("%02x" , hash_value[i]);
 		hashValue = hashValue + temp[0] + temp[1];
@@ -264,8 +263,6 @@ void send_ip_port(int sockfd, string &hashValue){
 				printf("send file error\n");
 				exit(0);			
 	}	
-	peer_list.close();
-	
-		
-	
+	peer_list.close();	
 }
+
