@@ -155,10 +155,10 @@ void giveAllTorrents(int connfd) {
 	rewind (file);
 	char* buffer = (char*) malloc (fileSize);
 	fread(buffer, 1, fileSize, file);
-    	if (send(connfd, buffer, fileSize, 0) < 0) {
-        	printf("send file error\n");
-        	exit(0);
-    	}		
+	if (send(connfd, buffer, fileSize, 0) < 0) {
+    	printf("send file error\n");
+    	exit(0);
+	}		
 	free(buffer);
 }
 
