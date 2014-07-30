@@ -20,6 +20,7 @@ using namespace std;
 
 map<string, string> hash_map;   // key:info_hash, value:torrent_file_name
 
+void handshake(int connfd, char* info_hash);
 void handle_handshake(int connfd, int length);
 
 int main(int argc, char* argv[]) {
@@ -115,6 +116,28 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void handshake(int connfd, char* info_hash) {
+	char mes_id = '0';
+	int mes_len = 4 + 1 + strlen(info_hash);    
+
+	if (send(connfd, &mes_len, sizeof(uint32_t), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }	
+
+	if (send(connfd, &mes_id, sizeof(char), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+    
+	if (send(connfd, info_hash, strlen(info_hash), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	printf("Initiate handshake in connfd%i, content: %i%s", connfd, mes_len, info_hash);  
+}
+
 void handle_handshake(int connfd, int length) {
     int n;
     char* hash_info = new char[length];
@@ -123,7 +146,7 @@ void handle_handshake(int connfd, int length) {
     hash_info[length - 1] = '\0';
     
     // search hash_info from hash_map
-    string hash_info_str(hash_info);    
+    string hash_info_str(hash_info);   
     if(hash_map.find(hash_info) == hash_map.end()) {
         // hash_info not found
         return;
