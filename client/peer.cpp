@@ -277,9 +277,6 @@ void *listen_for_request(void *arg) {
             printf("accept error\n");
             continue;
         }
-     
-		int piece_num;
-		n = recv(connfd, &piece_num, sizeof(int), 0);
 
         int length;
         n = recv(connfd, &length, sizeof(int), 0);      
@@ -289,6 +286,8 @@ void *listen_for_request(void *arg) {
 		  
         // receive request
 		if (message_id == '3') {
+			int piece_num;
+			n = recv(connfd, &piece_num, sizeof(int), 0);
 			for (int i = 0; i < piece_num; i++) {
 				reply(connfd, (char*)arg);
 			}
