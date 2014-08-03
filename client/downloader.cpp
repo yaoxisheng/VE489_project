@@ -20,7 +20,7 @@ const int BLOCK_SIZE = 4*1024*1024;
 const int HASH_OUTPUT_SIZE = 20;
 void handshake(int connfd, char* info_hash);
 void *download_helper(void *arg);
-void get_bitfiled(int port, int &new_port, int id);
+void get_bitfield(int port, int &new_port, int id);
 map<int, vector<int> > bitfield_map;
 pthread_mutex_t map_lock;
 int global_id;
@@ -114,6 +114,7 @@ int main(int argc, char* argv[]) {
 	char flag = 'w';
 	
 	pthread_mutex_init(&map_lock,NULL);
+	vector<pthread_t*> all_thread;
 
 	while(flag != 'e'){
 		n = recv(sockfd, &flag, sizeof(char), 0);
@@ -126,24 +127,23 @@ int main(int argc, char* argv[]) {
 			peer_info->ip[fileSize] = '\0';
 			memcpy(peer_info->hash_info, hash_value, 20);
 			printf("size is %i, ip is %s, port is %i\n",fileSize,peer_info->ip, peer_info->port);
-			printf("Hash info is \n");			
-			for (int i = 0; i < 20; i++) {
-	    		printf("%02x" , peer_info->hash_info[i]);
-    		}
 			pthread_t * thread_id = new pthread_t;
-			pthread_create(thread_id,NULL,download_helper,peer_info);				
-			//free(ip);
-			free(peer_info->ip);
-			delete peer_info;		
+			all_thread.push_back(thread_id);
+			pthread_create(thread_id,NULL,download_helper,peer_info);						
 		}
-	}	
+	}
 	disconnectToServer(sockfd);
-
+	for(int i=0; i<all_thread.size(); i++){
+		pthread_join(*all_thread[i], NULL);	
+	}
+	for(int i=0; i<all_thread.size(); i++){
+		delete all_thread[i];	
+	}	
 	return 0;
 }
 
 void handshake(int connfd, char* info_hash) {
-	char mes_id = 'h';
+	char mes_id = '0';
 	int mes_len = 4 + 1 + 20;    
 
 	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
@@ -161,43 +161,59 @@ void handshake(int connfd, char* info_hash) {
         exit(0);
     }
 
-	printf("Initiate handshake in connfd%i, content: %i%s", connfd, mes_len, info_hash);  
+	printf("Initiate handshake in connfd%i, content: %i \n", connfd, mes_len);  
 }
 void *download_helper(void *arg){
 	int id = global_id;
-	global_id++;	
-	connectToServer(((ip_info*)arg)->ip, ((ip_info*)arg)->port);
+	int sockfd;
+	global_id++;
+	printf("in thread function ip is %s, port is %i\n", ((ip_info*)arg)->ip, ((ip_info*)arg)->port);	
+	sockfd = connectToServer(((ip_info*)arg)->ip, ((ip_info*)arg)->port);
+	printf("connected to server\n");
 	//handshake
-	handshake(((ip_info*)arg)->port, (char *)((ip_info*)arg)->hash_info);
+	printf("hash_info in handshake is \n");
+	 for (int i = 0; i < 20; i++) {
+	   			 printf("%02x" , ((ip_info*)arg)->hash_info[i]);
+    	}
+	printf("\n");
+	handshake(sockfd, (char *)((ip_info*)arg)->hash_info);
 	int length, n;	
 	char message_id;
 	// receive handshake handle;
-	n = recv(((ip_info*)arg)->port, &length, sizeof(int), 0);	
+	n = recv(sockfd, &length, sizeof(int), 0);	
 	if(n <= 0){
 		printf("No result found in this peer\n");
 		free(((ip_info*)arg)->ip);
 		delete ((ip_info*)arg);
 		return NULL;
 	}
-	n = recv(((ip_info*)arg)->port, &message_id, sizeof(char), 0);
+	n = recv(sockfd, &message_id, sizeof(char), 0);
 	printf("message_id is %c\n", message_id);
 
-	// receive bitfiled
+	// receive bitfield
 	int new_port;
-	get_bitfiled(((ip_info*)arg)->port, new_port, id);
+	get_bitfield(sockfd, new_port, id);
 	
 	free(((ip_info*)arg)->ip);
 	delete ((ip_info*)arg);
 }
 
-void get_bitfiled(int port, int &new_port, int id){
+void get_bitfield(int port, int &new_port, int id){
 	int n, length;
+	char message_id;	
 	n = recv(port, &length, sizeof(int), 0);
-	char* bitfiled = (char*) malloc (length);
-	n = recv(port, bitfiled, length, 0);
+	printf("length is %i\n", length);
+	n = recv(port, &message_id, sizeof(char), 0);
+	char* bitfield = (char*) malloc (length);
+	n = recv(port, bitfield, length-4-1-4, 0);
+	for(int i=0; i<(length-4-4-1); i++){
+		printf("%c",bitfield[i]);	
+	}
+	printf("\n");
 	n = recv(port, &new_port, sizeof(int), 0);
-	for(int i=0; i<length; i++){
-		if(bitfiled[i]){
+	printf("new_port_number is %i\n", new_port);
+	for(int i=0; i<(length-4-1-4); i++){
+		if(bitfield[i]=='1'){
 			pthread_mutex_lock(&map_lock);
 			if(bitfield_map.find(i)==bitfield_map.end()){
 				vector<int> bitfield_vector;
@@ -205,6 +221,7 @@ void get_bitfiled(int port, int &new_port, int id){
 			}		
 			bitfield_map[i].push_back(id);
 			pthread_mutex_unlock(&map_lock);
-		}	
+			printf("piece is %i, id is %i\n", i,id);
+		}
 	}
 }
