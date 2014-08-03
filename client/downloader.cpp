@@ -10,11 +10,26 @@
 #include <iostream>
 #include <istream>
 #include <cstring>
+#include <pthread.h>
+#include <map>
+#include <vector>
 
 using namespace std;
 
 const int BLOCK_SIZE = 4*1024*1024;
 const int HASH_OUTPUT_SIZE = 20;
+void handshake(int connfd, char* info_hash);
+void *download_helper(void *arg);
+void get_bitfiled(int port, int &new_port, int id);
+map<int, vector<int> > bitfield_map;
+pthread_mutex_t map_lock;
+int global_id;
+
+struct ip_info{
+	int port;
+	char* ip;
+	unsigned char hash_info[20];
+};
 
 int main(int argc, char* argv[]) {
 	FILE* 	pFile;
@@ -26,6 +41,8 @@ int main(int argc, char* argv[]) {
 	int 	blocks_num;
 
   	unsigned char* 	buffer;	
+	
+	global_id = 0;
 
 	// check server IP
 	if (argc < 2) {
@@ -95,22 +112,99 @@ int main(int argc, char* argv[]) {
 		exit(0);	
 	}
 	char flag = 'w';
+	
+	pthread_mutex_init(&map_lock,NULL);
+
 	while(flag != 'e'){
-		printf("jinlaile\n");
 		n = recv(sockfd, &flag, sizeof(char), 0);
 		if(flag == 'r'){
 			n = recv(sockfd, &fileSize, sizeof(int), 0);
-			char* ip = (char*) malloc (fileSize+1);
-			n = recv(sockfd, ip, fileSize, 0);
-			int port;
-			n = recv(sockfd, &port, sizeof(int), 0);
-			ip[fileSize] = '\0';
-			printf("size is %i, ip is %s, port is %i\n",fileSize,ip, port);			
-			connectToServer(ip, port);			
-			free(ip);		
+			ip_info *peer_info = new ip_info;
+			peer_info->ip = (char*) malloc (fileSize+1);
+			n = recv(sockfd, peer_info->ip, fileSize, 0);			
+			n = recv(sockfd, &(peer_info->port), sizeof(int), 0);			
+			peer_info->ip[fileSize] = '\0';
+			memcpy(peer_info->hash_info, hash_value, 20);
+			printf("size is %i, ip is %s, port is %i\n",fileSize,peer_info->ip, peer_info->port);
+			printf("Hash info is \n");			
+			for (int i = 0; i < 20; i++) {
+	    		printf("%02x" , peer_info->hash_info[i]);
+    		}
+			pthread_t * thread_id = new pthread_t;
+			pthread_create(thread_id,NULL,download_helper,peer_info);				
+			//free(ip);
+			free(peer_info->ip);
+			delete peer_info;		
 		}
 	}	
 	disconnectToServer(sockfd);
 
 	return 0;
+}
+
+void handshake(int connfd, char* info_hash) {
+	char mes_id = 'h';
+	int mes_len = 4 + 1 + 20;    
+
+	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }	
+
+	if (send(connfd, &mes_id, sizeof(char), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+    
+	if (send(connfd, info_hash, 20, 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	printf("Initiate handshake in connfd%i, content: %i%s", connfd, mes_len, info_hash);  
+}
+void *download_helper(void *arg){
+	int id = global_id;
+	global_id++;	
+	connectToServer(((ip_info*)arg)->ip, ((ip_info*)arg)->port);
+	//handshake
+	handshake(((ip_info*)arg)->port, (char *)((ip_info*)arg)->hash_info);
+	int length, n;	
+	char message_id;
+	// receive handshake handle;
+	n = recv(((ip_info*)arg)->port, &length, sizeof(int), 0);	
+	if(n <= 0){
+		printf("No result found in this peer\n");
+		free(((ip_info*)arg)->ip);
+		delete ((ip_info*)arg);
+		return NULL;
+	}
+	n = recv(((ip_info*)arg)->port, &message_id, sizeof(char), 0);
+	printf("message_id is %c\n", message_id);
+
+	// receive bitfiled
+	int new_port;
+	get_bitfiled(((ip_info*)arg)->port, new_port, id);
+	
+	free(((ip_info*)arg)->ip);
+	delete ((ip_info*)arg);
+}
+
+void get_bitfiled(int port, int &new_port, int id){
+	int n, length;
+	n = recv(port, &length, sizeof(int), 0);
+	char* bitfiled = (char*) malloc (length);
+	n = recv(port, bitfiled, length, 0);
+	n = recv(port, &new_port, sizeof(int), 0);
+	for(int i=0; i<length; i++){
+		if(bitfiled[i]){
+			pthread_mutex_lock(&map_lock);
+			if(bitfield_map.find(i)==bitfield_map.end()){
+				vector<int> bitfield_vector;
+				bitfield_map[i] = bitfield_vector;			
+			}		
+			bitfield_map[i].push_back(id);
+			pthread_mutex_unlock(&map_lock);
+		}	
+	}
 }
