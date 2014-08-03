@@ -31,6 +31,7 @@ void *setup_piece_download_conn(void *arg);
 map<int, vector<int> > bitfield_map;
 vector<int> download_time;
 map<int, int> download_map;
+map<int, vector<int> > thread_piece_map;
 map<int, char*> thread_ip_info; 
 map<int, int> thread_port_info;
 pthread_mutex_t map_lock;
@@ -47,7 +48,7 @@ struct ip_info{
 struct piece_info{
 	int port;
 	char* ip;
-	int index;
+	vector<int> index_vec;
 };
 
 int main(int argc, char* argv[]) {
@@ -154,10 +155,6 @@ int main(int argc, char* argv[]) {
 	}
 	disconnectToServer(sockfd);
 
-/*
-
-*/
-
 	for(int i=0; i<all_thread.size(); i++){
 		pthread_join(*all_thread[i], NULL);	
 	}
@@ -165,7 +162,7 @@ int main(int argc, char* argv[]) {
 		delete all_thread[i];	
 	}
 	// protocol design
-	for(int i=0; i<total_piece; i++){
+	for(int i = 0; i < total_piece; i++){
 		int min = INT_MAX;
 		int min_ele = -1;
 		for(int j=0; j<bitfield_map[i].size(); j++){
@@ -179,20 +176,28 @@ int main(int argc, char* argv[]) {
 		}		
 	}
 
+	for (int i = 0; i < total_piece; i++) {
+		if (thread_piece_map.find(download_map[i]) == thread_piece_map.end()) {
+			vector<int> v;
+			thread_piece_map[download_map[i]] = v;
+		}
+		thread_piece_map[download_map[i]].push_back(i);
+	}
+
 	//request
 	vector<pthread_t*> piece_thread;
-	for (int i = 0; i < total_piece; i++) {
+	for (auto it = thread_piece_map.begin(); it != thread_piece_map.end(); it++) {
 		piece_info* piece = new piece_info; 	
-		piece->index = i;
-		piece->ip = thread_ip_info[download_map[i]]; 
-		piece->port = thread_port_info[download_map[i]];
+		piece->index_vec = it->second;
+		piece->ip = thread_ip_info[it->first]; 
+		piece->port = thread_port_info[it->first];
 		pthread_t * thread_id = new pthread_t;
 		piece_thread.push_back(thread_id);
-		pthread_create(thread_id,NULL,setup_piece_download_conn,piece);	
+		pthread_create(thread_id,NULL,setup_piece_download_conn,piece);
 	}	
 
 	for(int i=0; i<piece_thread.size(); i++){
-			pthread_join(*piece_thread[i], NULL);	
+		pthread_join(*piece_thread[i], NULL);	
 	}
 	for(int i=0; i<piece_thread.size(); i++){
 		delete piece_thread[i];	
@@ -379,7 +384,11 @@ void handle_reply(int connfd) {
 void *setup_piece_download_conn(void *arg){
 	printf("A new connection sets up");
 	int connfd = connectToServer(((piece_info*)arg)->ip, ((piece_info*)arg)->port);
-	request(connfd, ((piece_info*)arg)->index);
+	
+	for (int i = 0; i < ((piece_info*)arg)->index_vec.size(); i++) {
+		request(connfd, ((piece_info*)arg)->index_vec[i]);
+	}
+
 	handle_reply(connfd);
 	disconnectToServer(connfd);
 	free(((piece_info*)arg)->ip);
