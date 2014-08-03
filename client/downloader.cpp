@@ -294,6 +294,12 @@ void request(int connfd, void *arg) {
 	char mes_id = '3';
 	int mes_len = 4 + 1 + 4;  
 
+	int num = ((piece_info*)arg)->index_vec.size();
+	if (send(connfd, &num, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
 	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
         printf("send error\n");
         exit(0);
@@ -304,12 +310,6 @@ void request(int connfd, void *arg) {
         exit(0);
     }
     
-	int num = ((piece_info*)arg)->index_vec.size();
-	if (send(connfd, &num, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }	
-
 	printf("Request piece num:%i\n",num);  
 }
 
@@ -382,9 +382,10 @@ void handle_reply(int connfd) {
 }
 
 void *setup_piece_download_conn(void *arg){
-	printf("A new connection sets up");
+	printf("A new connection sets up\n");
 	int connfd = connectToServer(((piece_info*)arg)->ip, ((piece_info*)arg)->port);
 	
+	request(connfd, arg);
 	for (int i = 0; i < ((piece_info*)arg)->index_vec.size(); i++) {
 		int piece_index = ((piece_info*)arg)->index_vec[i];
 		if (send(connfd, &piece_index, sizeof(int), 0) < 0) {
