@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <openssl/sha.h>
 #include <pthread.h>
@@ -25,6 +26,7 @@ map<string, string> hash_map;   // key:info_hash, value:torrent_file_name
 
 void handle_handshake(int connfd, int length);
 void *listen_for_request(void *arg);
+void reply(int connfd, int piece_index, int piece_offset, char* data);
 
 int main(int argc, char* argv[]) {
     // read torrent list
@@ -265,3 +267,70 @@ void *listen_for_request(void *arg) {
     return NULL;
 }
 
+void reply(int connfd) {
+	// receive request   
+	int piece_index, piece_offset, data_len;	
+	if (recv(connfd, &piece_index, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (recv(connfd, &piece_offset, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (recv(connfd, &data_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    } 
+
+	// get data from file;
+	char* data = (char*) malloc (data_len + 1);
+	ostringstream file_name;
+	file_name << piece_index << '_' << piece_offset;
+	FILE* oFile = fopen (file_name.str().c_str(), "rb");
+	if (oFile != NULL) {
+		file_name.str("");
+		file_name << piece_index << ".avi";
+		oFile = fopen (file_name.str().c_str(), "rb");	
+		if (oFile == NULL) {
+			printf("open file %s error\n", file_name.str().c_str());
+       		exit(0);	
+		}
+		fseek (oFile, piece_offset*4194304, SEEK_SET);
+	}
+	fread(data, 1, data_len, oFile);
+	data[data_len] = '\0';
+	fclose(oFile); 
+	
+	// reply
+	char mes_id = '4';
+	int mes_len = 4 + 1 + 4 + 4 + strlen(data);
+	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }	
+
+	if (send(connfd, &mes_id, sizeof(char), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+    
+	if (send(connfd, &piece_index, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (send(connfd, &piece_offset, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (send(connfd, data, strlen(data), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	printf("Reply in connfd%i, index:%i, offset:%i", connfd, piece_index, piece_offset);  
+}

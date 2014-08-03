@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cstdlib>
+#include <stdlib.h>
 #include <cmath>
 #include <openssl/sha.h>
 #include <sys/socket.h>
@@ -9,6 +10,7 @@
 #include <string>
 #include <iostream>
 #include <istream>
+#include <sstream>
 #include <cstring>
 #include <pthread.h>
 #include <map>
@@ -21,6 +23,9 @@ const int HASH_OUTPUT_SIZE = 20;
 void handshake(int connfd, char* info_hash);
 void *download_helper(void *arg);
 void get_bitfiled(int port, int &new_port, int id);
+void request(int connfd, int piece_index, int piece_offset, int data_len);
+void handle_reply(int connfd, int mes_len);
+
 map<int, vector<int> > bitfield_map;
 pthread_mutex_t map_lock;
 int global_id;
@@ -207,4 +212,70 @@ void get_bitfiled(int port, int &new_port, int id){
 			pthread_mutex_unlock(&map_lock);
 		}	
 	}
+}
+
+
+void request(int connfd, int piece_index, int piece_offset, int data_len) {
+	char mes_id = '3';
+	int mes_len = 4 + 1 + 4 + 4 + 4;    
+
+	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }	
+
+	if (send(connfd, &mes_id, sizeof(char), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+    
+	if (send(connfd, &piece_index, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (send(connfd, &piece_offset, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (send(connfd, &data_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	printf("Request in connfd%i, index:%i, offset:%i, len: %i", 
+			connfd, piece_index, piece_offset, data_len);  
+}
+
+void handle_reply(int connfd, int mes_len) {
+	int piece_index;
+	int piece_offset;
+	int data_len = mes_len - 13;   
+	char* buff = (char*) malloc (data_len + 1);
+    
+	if (recv(connfd, &piece_index, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (recv(connfd, &piece_offset, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (recv(connfd, buff, data_len, 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+	buff[data_len] = '\0';
+
+	ostringstream file_name;
+	file_name << piece_index << '_' << piece_offset;
+	FILE *oFile;
+    oFile = fopen(file_name.str().c_str(), "w");
+    fprintf(oFile, "%s", buff);
+	fclose(oFile);
+
+	printf("Receiving file %s", file_name.str().c_str()); 
 }
