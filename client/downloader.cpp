@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <map>
 #include <vector>
+#include <limits.h>
 
 using namespace std;
 
@@ -22,8 +23,11 @@ void handshake(int connfd, char* info_hash);
 void *download_helper(void *arg);
 void get_bitfield(int port, int &new_port, int id);
 map<int, vector<int> > bitfield_map;
+vector<int> download_time;
+map<int, int> download_map;
 pthread_mutex_t map_lock;
 int global_id;
+int total_piece;
 
 struct ip_info{
 	int port;
@@ -43,6 +47,7 @@ int main(int argc, char* argv[]) {
   	unsigned char* 	buffer;	
 	
 	global_id = 0;
+	total_piece = 0;
 
 	// check server IP
 	if (argc < 2) {
@@ -116,6 +121,7 @@ int main(int argc, char* argv[]) {
 	pthread_mutex_init(&map_lock,NULL);
 	vector<pthread_t*> all_thread;
 
+	//multiple threads, connect to peer
 	while(flag != 'e'){
 		n = recv(sockfd, &flag, sizeof(char), 0);
 		if(flag == 'r'){
@@ -138,7 +144,22 @@ int main(int argc, char* argv[]) {
 	}
 	for(int i=0; i<all_thread.size(); i++){
 		delete all_thread[i];	
-	}	
+	}
+	// protocol design
+	for(int i=0; i<total_piece; i++){
+		int min = INT_MAX;
+		int min_ele = -1;
+		for(int j=0; j<bitfield_map[i].size(); j++){
+			if(download_time[bitfield_map[i][j]] < min){
+				min_ele = bitfield_map[i][j];			
+			}		
+		}
+		download_map[i] = min_ele;
+		if(min_ele != -1){		
+			download_time[min_ele] = download_time[min_ele]++;	
+		}		
+	}
+		
 	return 0;
 }
 
@@ -193,7 +214,7 @@ void *download_helper(void *arg){
 	// receive bitfield
 	int new_port;
 	get_bitfield(sockfd, new_port, id);
-	
+	download_time.push_back(0);
 	free(((ip_info*)arg)->ip);
 	delete ((ip_info*)arg);
 }
@@ -205,6 +226,7 @@ void get_bitfield(int port, int &new_port, int id){
 	printf("length is %i\n", length);
 	n = recv(port, &message_id, sizeof(char), 0);
 	char* bitfield = (char*) malloc (length);
+	total_piece = length-4-1-4;
 	n = recv(port, bitfield, length-4-1-4, 0);
 	for(int i=0; i<(length-4-4-1); i++){
 		printf("%c",bitfield[i]);	
