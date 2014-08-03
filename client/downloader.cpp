@@ -226,7 +226,6 @@ void get_bitfield(int port, int &new_port, int id){
 	printf("length is %i\n", length);
 	n = recv(port, &message_id, sizeof(char), 0);
 	char* bitfield = (char*) malloc (length);
-	total_piece = length-4-1-4;
 	n = recv(port, bitfield, length-4-1-4, 0);
 	for(int i=0; i<(length-4-4-1); i++){
 		printf("%c",bitfield[i]);	
@@ -237,6 +236,7 @@ void get_bitfield(int port, int &new_port, int id){
 	for(int i=0; i<(length-4-1-4); i++){
 		if(bitfield[i]=='1'){
 			pthread_mutex_lock(&map_lock);
+			total_piece = length-4-1-4;
 			if(bitfield_map.find(i)==bitfield_map.end()){
 				vector<int> bitfield_vector;
 				bitfield_map[i] = bitfield_vector;			
