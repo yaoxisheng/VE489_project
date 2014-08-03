@@ -339,45 +339,47 @@ void handle_reply(int connfd) {
         exit(0);
     }
 
-	char* buff = (char*) malloc (data_len + 1);
-	if (recv(connfd, buff, data_len, 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-	buff[data_len] = '\0';
+	char* buff = (char*) malloc (data_len);
+	int recvd = 0;
+	while(recvd < data_len)
+	{
+  	 	int result = recv(connfd, buff+recvd,data_len-recvd,0);
+   		if (result <= 0) break;
+   		recvd += result;
+	}
 
 	ostringstream temp;
 	temp << piece_index;
 	string file_name = input_str.substr(0, input_str.find('.')) + '_' + temp.str() + ".temp";
 	FILE *oFile;
     oFile = fopen(file_name.c_str(), "w");
-    fprintf(oFile, "%s", buff);
+    fwrite(buff, 1, data_len, oFile);
 	fclose(oFile);
 	free(buff);
 
-	printf("Received file %s", file_name.c_str()); 
+	printf("Received file %s\n", file_name.c_str()); 
 
 	piece_num++;
 	if (piece_num == total_piece) {
 		file_name = input_str.substr(0, input_str.find('.')) + ".avi";
 		FILE *com_file = fopen(file_name.c_str(), "w");	
-		char* buffer = (char*) malloc (BLOCK_SIZE + 1);
+		char* buffer = (char*) malloc (BLOCK_SIZE);
 		for (int i = 0; i < piece_num; i++) {
-			temp << piece_num;
+			temp.str("");			
+			temp << i;
 			file_name = input_str.substr(0, input_str.find('.')) + '_' + temp.str() + ".temp";
-			oFile = fopen(file_name.c_str(), "w");
+			oFile = fopen(file_name.c_str(), "r");
   			fseek (oFile, 0, SEEK_END);
   			int oFileSize = ftell (oFile);
 			rewind (oFile);
 			fread(buffer, 1, oFileSize, oFile);
-			buffer[oFileSize] = '\0';
 
-			fseek(com_file, piece_num * BLOCK_SIZE, SEEK_SET);
-    		fprintf(com_file, "%s", buffer);
+			fseek(com_file, i * BLOCK_SIZE, SEEK_SET);
+    		fwrite(buffer, 1, oFileSize, com_file);
 			fclose(oFile);
 		}
-	free(buff);
-	fclose(com_file);
+		free(buffer);
+		fclose(com_file);
 	}
 }
 
