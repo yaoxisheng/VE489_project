@@ -37,7 +37,6 @@ pthread_mutex_t map_lock;
 int global_id;
 int piece_num = 0;
 int total_piece;
-
 struct ip_info{
 	int port;
 	char* ip;
@@ -223,8 +222,6 @@ void handshake(int connfd, char* info_hash) {
 }
 void *download_helper(void *arg){
 	int id = global_id;
-	thread_ip_info[id] = ((ip_info*)arg)->ip;
-	thread_port_info[id] = ((ip_info*)arg)->port;
 	int sockfd; 
 	global_id++;
 	printf("in thread function ip is %s, port is %i\n", ((ip_info*)arg)->ip, ((ip_info*)arg)->port);	
@@ -253,6 +250,8 @@ void *download_helper(void *arg){
 	// receive bitfield
 	int new_port;
 	get_bitfield(sockfd, new_port, id);
+	thread_ip_info[id] = ((ip_info*)arg)->ip;
+	thread_port_info[id] = new_port;
 	download_time.push_back(0);
 	delete ((ip_info*)arg);
 }
