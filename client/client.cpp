@@ -12,7 +12,7 @@
 #include "client.h"
 
 int connectToServer(char* serverIP, int port) {
-	printf("connecting to server\n");
+	printf("connecting to IP:%s, port:%i\n", serverIP, port);
 
 	int sockfd;
     struct sockaddr_in servaddr;

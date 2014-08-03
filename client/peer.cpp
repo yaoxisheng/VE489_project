@@ -26,7 +26,7 @@ map<string, string> hash_map;   // key:info_hash, value:torrent_file_name
 
 void handle_handshake(int connfd, int length);
 void *listen_for_request(void *arg);
-void reply(int connfd, int piece_index, int piece_offset, char* data);
+void reply(int connfd);
 
 int main(int argc, char* argv[]) {
     // read torrent list
@@ -259,6 +259,9 @@ void *listen_for_request(void *arg) {
         n = recv(connfd, &message_id, sizeof(char), 0);
         
         // receive request
+		if (message_id == '3') {
+			reply(connfd);
+		}
 	
         close(connfd);
     }

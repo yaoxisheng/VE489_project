@@ -36,6 +36,14 @@ struct ip_info{
 	unsigned char hash_info[20];
 };
 
+struct piece_info{
+	int port;
+	char* ip;
+	int index;
+	int offset;
+	int len;
+};
+
 int main(int argc, char* argv[]) {
 	FILE* 	pFile;
 	string 	pFileName;  
@@ -138,6 +146,14 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	disconnectToServer(sockfd);
+
+/*
+	piece_info* piece; 	
+	pthread_t * thread_id = new pthread_t;
+	all_thread.push_back(thread_id);
+	pthread_create(thread_id,NULL,setup_piece_download_conn,piece);	
+*/
+
 	for(int i=0; i<all_thread.size(); i++){
 		pthread_join(*all_thread[i], NULL);	
 	}
@@ -222,7 +238,6 @@ void get_bitfiled(int port, int &new_port, int id){
 	}
 }
 
-
 void request(int connfd, int piece_index, int piece_offset, int data_len) {
 	char mes_id = '3';
 	int mes_len = 4 + 1 + 4 + 4 + 4;    
@@ -256,12 +271,30 @@ void request(int connfd, int piece_index, int piece_offset, int data_len) {
 			connfd, piece_index, piece_offset, data_len);  
 }
 
-void handle_reply(int connfd, int mes_len) {
+void handle_reply(int connfd) {
 	int piece_index;
 	int piece_offset;
-	int data_len = mes_len - 13;   
+	int mes_len;
+	int data_len;  
+	char mes_id; 
 	char* buff = (char*) malloc (data_len + 1);
     
+	if (recv(connfd, &mes_len, sizeof(int), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+	data_len = mes_len - 13;	
+
+	if (recv(connfd, &mes_id, sizeof(char), 0) < 0) {
+        printf("send error\n");
+        exit(0);
+    }
+
+	if (mes_id != '4') {
+		printf("receive mes_id not reply\n");
+        exit(0);
+	}
+
 	if (recv(connfd, &piece_index, sizeof(int), 0) < 0) {
         printf("send error\n");
         exit(0);
@@ -286,4 +319,14 @@ void handle_reply(int connfd, int mes_len) {
 	fclose(oFile);
 
 	printf("Receiving file %s", file_name.str().c_str()); 
+	free(buff);
 }
+
+void *setup_piece_download_conn(void *arg){
+	printf("A new connection sets up");
+	int connfd = connectToServer(((piece_info*)arg)->ip, ((piece_info*)arg)->port);
+	request(connfd, ((piece_info*)arg)->index, ((piece_info*)arg)->offset, ((piece_info*)arg)->len);
+	handle_reply(connfd);
+	disconnectToServer(connfd);
+}
+
