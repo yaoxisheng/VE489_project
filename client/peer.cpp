@@ -236,11 +236,10 @@ void handle_handshake(int connfd, int length) {
     }
     
     // create new thread to listen for request
-    pthread_t thread_id;
-	char* video_prefix = (char*) malloc(video_name.find('.') + 1);
-	memcpy(video_prefix, &video_name, video_name.find('.'));
-	video_prefix[video_name.find('.')] = '\0';
-    pthread_create(&thread_id, NULL, listen_for_request, (void*)video_prefix);    
+    pthread_t * thread_id = new pthread_t;
+	const char* video_prefix = (char*) malloc(video_name.find('.') + 1);
+	video_prefix = video_name.substr(0, video_name.find('.')).c_str();
+    pthread_create(thread_id, NULL, listen_for_request, (void*)video_prefix);   
 }
 
 void *listen_for_request(void *arg) {
@@ -278,16 +277,21 @@ void *listen_for_request(void *arg) {
             printf("accept error\n");
             continue;
         }
-        
+     
+		int piece_num;
+		n = recv(connfd, &piece_num, sizeof(int), 0);
+
         int length;
         n = recv(connfd, &length, sizeof(int), 0);      
-        
+
         char message_id;
         n = recv(connfd, &message_id, sizeof(char), 0);
-        
+		  
         // receive request
 		if (message_id == '3') {
-			reply(connfd, (char*)arg);
+			for (int i = 0; i < piece_num; i++) {
+				reply(connfd, (char*)arg);
+			}
 		}
 	
         close(connfd);
@@ -304,7 +308,7 @@ void reply(int connfd, char* video_prefix) {
         printf("send error\n");
         exit(0);
     } 
-	printf("peer requests index %i", piece_index);
+	printf("peer requests index %i\n", piece_index);
 
 	// get data from file;
 	int data_len;
@@ -341,7 +345,7 @@ void reply(int connfd, char* video_prefix) {
 	fread(data, 1, data_len, oFile);
 	data[data_len] = '\0';
 	fclose(oFile); 
-	printf("will send file %s, index %i, size %i", file_name.c_str(), piece_index, data_len);
+	printf("will send file %s, index %i, size %i\n", file_name.c_str(), piece_index, data_len);
 	
 	// reply
 	char mes_id = '4';
@@ -366,5 +370,5 @@ void reply(int connfd, char* video_prefix) {
         exit(0);
     }
 
-	printf("Sent file %s", file_name.c_str());  
+	printf("Sent file %s\n", file_name.c_str());  
 }
