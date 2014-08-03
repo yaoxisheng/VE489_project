@@ -18,17 +18,18 @@
 
 using namespace std;
 
+string input_str;
 const int BLOCK_SIZE = 4*1024*1024;
 const int HASH_OUTPUT_SIZE = 20;
 void handshake(int connfd, char* info_hash);
 void *download_helper(void *arg);
-void get_bitfiled(int port, int &new_port, int id);
-void request(int connfd, int piece_index, int piece_offset, int data_len);
-void handle_reply(int connfd, int mes_len);
-
+void request(int connfd, int piece_index);
+void handle_reply(int connfd);
+void get_bitfield(int port, int &new_port, int id);
 map<int, vector<int> > bitfield_map;
 pthread_mutex_t map_lock;
 int global_id;
+int piece_num = 0;
 
 struct ip_info{
 	int port;
@@ -40,8 +41,6 @@ struct piece_info{
 	int port;
 	char* ip;
 	int index;
-	int offset;
-	int len;
 };
 
 int main(int argc, char* argv[]) {
@@ -80,7 +79,6 @@ int main(int argc, char* argv[]) {
 	delete buff;
 	
 	cout<<"Please choose the file you want:"<<endl;
-	string input_str;
 	cin >> input_str;
 	const char * input = input_str.c_str();
 	printf("input is %s\n", input);
@@ -211,22 +209,30 @@ void *download_helper(void *arg){
 	n = recv(sockfd, &message_id, sizeof(char), 0);
 	printf("message_id is %c\n", message_id);
 
-	// receive bitfiled
+	// receive bitfield
 	int new_port;
-	get_bitfiled(sockfd, new_port, id);
+	get_bitfield(sockfd, new_port, id);
 	
 	free(((ip_info*)arg)->ip);
 	delete ((ip_info*)arg);
 }
 
-void get_bitfiled(int port, int &new_port, int id){
+void get_bitfield(int port, int &new_port, int id){
 	int n, length;
+	char message_id;	
 	n = recv(port, &length, sizeof(int), 0);
-	char* bitfiled = (char*) malloc (length);
-	n = recv(port, bitfiled, length, 0);
+	printf("length is %i\n", length);
+	n = recv(port, &message_id, sizeof(char), 0);
+	char* bitfield = (char*) malloc (length);
+	n = recv(port, bitfield, length-4-1-4, 0);
+	for(int i=0; i<(length-4-4-1); i++){
+		printf("%c",bitfield[i]);	
+	}
+	printf("\n");
 	n = recv(port, &new_port, sizeof(int), 0);
-	for(int i=0; i<length; i++){
-		if(bitfiled[i]){
+	printf("new_port_number is %i\n", new_port);
+	for(int i=0; i<(length-4-1-4); i++){
+		if(bitfield[i]=='1'){
 			pthread_mutex_lock(&map_lock);
 			if(bitfield_map.find(i)==bitfield_map.end()){
 				vector<int> bitfield_vector;
@@ -234,13 +240,14 @@ void get_bitfiled(int port, int &new_port, int id){
 			}		
 			bitfield_map[i].push_back(id);
 			pthread_mutex_unlock(&map_lock);
-		}	
+			printf("piece is %i, id is %i\n", i,id);
+		}
 	}
 }
 
-void request(int connfd, int piece_index, int piece_offset, int data_len) {
+void request(int connfd, int piece_index) {
 	char mes_id = '3';
-	int mes_len = 4 + 1 + 4 + 4 + 4;    
+	int mes_len = 4 + 1 + 4;  
 
 	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
         printf("send error\n");
@@ -257,41 +264,27 @@ void request(int connfd, int piece_index, int piece_offset, int data_len) {
         exit(0);
     }
 
-	if (send(connfd, &piece_offset, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-
-	if (send(connfd, &data_len, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-
-	printf("Request in connfd%i, index:%i, offset:%i, len: %i", 
-			connfd, piece_index, piece_offset, data_len);  
+	printf("Request piece index:%i",piece_index);  
 }
 
 void handle_reply(int connfd) {
-	int piece_index;
-	int piece_offset;
 	int mes_len;
-	int data_len;  
 	char mes_id; 
-	char* buff = (char*) malloc (data_len + 1);
+	int piece_index;
+	int data_len; 
     
 	if (recv(connfd, &mes_len, sizeof(int), 0) < 0) {
         printf("send error\n");
         exit(0);
     }
-	data_len = mes_len - 13;	
+	data_len = mes_len - 9;	
 
 	if (recv(connfd, &mes_id, sizeof(char), 0) < 0) {
         printf("send error\n");
         exit(0);
     }
-
 	if (mes_id != '4') {
-		printf("receive mes_id not reply\n");
+		printf("receive mes_id is not reply\n");
         exit(0);
 	}
 
@@ -300,32 +293,52 @@ void handle_reply(int connfd) {
         exit(0);
     }
 
-	if (recv(connfd, &piece_offset, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-
+	char* buff = (char*) malloc (data_len + 1);
 	if (recv(connfd, buff, data_len, 0) < 0) {
         printf("send error\n");
         exit(0);
     }
 	buff[data_len] = '\0';
 
-	ostringstream file_name;
-	file_name << piece_index << '_' << piece_offset;
+	ostringstream temp;
+	temp << piece_index;
+	string file_name = input_str.substr(0, input_str.find('.')) + '_' + temp.str() + ".temp";
 	FILE *oFile;
-    oFile = fopen(file_name.str().c_str(), "w");
+    oFile = fopen(file_name.c_str(), "w");
     fprintf(oFile, "%s", buff);
 	fclose(oFile);
-
-	printf("Receiving file %s", file_name.str().c_str()); 
 	free(buff);
+
+	printf("Received file %s", file_name.c_str()); 
+
+	piece_num++;
+	if (piece_num == total_piece) {
+		file_name = input_str.substr(0, input_str.find('.')) + ".avi";
+		FILE *com_file = fopen(file_name.c_str(), "w");	
+		char* buffer = (char*) malloc (BLOCK_SIZE + 1);
+		for (int i = 0; i < piece_num; i++) {
+			temp << piece_num;
+			file_name = input_str.substr(0, input_str.find('.')) + '_' + temp.str() + ".temp";
+			oFile = fopen(file_name.c_str(), "w");
+  			fseek (oFile, 0, SEEK_END);
+  			int oFileSize = ftell (oFile);
+			rewind (oFile);
+			fread(buffer, 1, oFileSize, oFile);
+			buffer[oFileSize] = '\0';
+
+			fseek(com_file, piece_num * BLOCK_SIZE, SEEK_SET);
+    		fprintf(com_file, "%s", buffer);
+			fclose(oFile);
+		}
+	free(buff);
+	fclose(com_file);
+	}
 }
 
 void *setup_piece_download_conn(void *arg){
 	printf("A new connection sets up");
 	int connfd = connectToServer(((piece_info*)arg)->ip, ((piece_info*)arg)->port);
-	request(connfd, ((piece_info*)arg)->index, ((piece_info*)arg)->offset, ((piece_info*)arg)->len);
+	request(connfd, ((piece_info*)arg)->index);
 	handle_reply(connfd);
 	disconnectToServer(connfd);
 }

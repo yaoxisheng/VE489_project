@@ -21,15 +21,17 @@
 
 using namespace std;
 
-int port_num = 7000;
+const int BLOCK_SIZE = 4*1024*1024;
+int port_num = 6882;
 map<string, string> hash_map;   // key:info_hash, value:torrent_file_name
 
 void handle_handshake(int connfd, int length);
 void *listen_for_request(void *arg);
-void reply(int connfd);
+void reply(int connfd, char* video_name);
 
 int main(int argc, char* argv[]) {
-    // read torrent list
+    // read torrent list    
+    cout << "reading torrent list" << endl;
     ifstream ifs("torrent_list");
     string torrent_file_name;
     while (getline(ifs, torrent_file_name)) {
@@ -67,6 +69,7 @@ int main(int argc, char* argv[]) {
     }
     
     // listen for handshake
+    cout << "listening for handshake" << endl;
     int listenfd, connfd;
     struct sockaddr_in servaddr;
     char buff;
@@ -80,7 +83,7 @@ int main(int argc, char* argv[]) {
     memset(&servaddr, 0 ,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(6666);
+    servaddr.sin_port = htons(6881);
     
     if (bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) {
         printf("bind error\n");
@@ -108,7 +111,7 @@ int main(int argc, char* argv[]) {
         n = recv(connfd, &message_id, sizeof(char), 0);
         
         switch (message_id) {
-            case 'h':
+            case '0':
                 handle_handshake(connfd, length);
                 break;
             default:
@@ -122,19 +125,27 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void handle_handshake(int connfd, int length) {    
+void handle_handshake(int connfd, int length) {
+    cout << "handshake received" << endl;
     int n;
-    char* info_hash = new char[length];
+    unsigned char* info_hash = new unsigned char[20];
     
-    n = recv(connfd, info_hash, length - sizeof(int) - 1, 0);
-    info_hash[length - 1] = '\0';
+    n = recv(connfd, info_hash, 20, 0);
     
     // search info_hash from hash_map
-    string info_hash_str(info_hash);
+    string info_hash_str;
+    for (int i = 0; i < 20; i++) {
+		char temp[3];
+		sprintf (temp, "%02x", info_hash[i]);
+		//printf("%02x" , hash_value[i]);
+		info_hash_str = info_hash_str + temp[0] + temp[1];
+	}   
+	
+    cout << "info_hash_str: " << info_hash_str << endl;    
     if(hash_map.find(info_hash_str) == hash_map.end()) {        
         cout << "info_hash not found" << endl;
         return;
-    }   
+    }
     
     // handshake reply
     int length2 = sizeof(int) + 1;
@@ -150,7 +161,8 @@ void handle_handshake(int connfd, int length) {
         exit(0);
     }
     
-    // send bitfield    
+    // send bitfield
+    cout << "sending bitfield" << endl;
     string torrent_file_name = hash_map[info_hash_str];
     ifstream ifs(torrent_file_name);
     
@@ -158,7 +170,11 @@ void handle_handshake(int connfd, int length) {
     string piece_num_str;
     getline(ifs, video_name);
     getline(ifs, piece_num_str);
+    getline(ifs, piece_num_str);
     ifs.close();
+
+    cout << "video name:" << video_name << endl;
+    cout << "piece num:" << piece_num_str << endl;    
     
     istringstream iss(piece_num_str);
     int piece_num;
@@ -166,13 +182,13 @@ void handle_handshake(int connfd, int length) {
     
     char bitfield[piece_num];
     for (int i = 0; i < piece_num; i++) {
-        bitfield[i] = 0;
+        bitfield[i] = '0';
     }
-    
+        
     ifstream ifs2(video_name);
     if (ifs2) {
         for (int i = 0; i < piece_num; i++) {
-            bitfield[i] = 1;
+            bitfield[i] = '1';
         }
         ifs2.close();
     } else {        
@@ -180,14 +196,21 @@ void handle_handshake(int connfd, int length) {
         ostringstream oss;
         for (int i = 0; i < piece_num; i++) {
             oss << i;
-            string video_piece = video_name_prefix + '_' + oss.str() + ".avi";
+            string video_piece = video_name_prefix + '_' + oss.str() + ".temp";
             ifstream ifs3(video_piece);
             if (ifs3) {
-                bitfield[i] = 1;
+                bitfield[i] = '1';
+                ifs3.close();
             }
             oss.str("");
         }
     }
+    
+    cout << "bitfield:";
+    for (int i = 0; i < piece_num; i++) {
+        cout << bitfield[i];
+    }
+    cout << endl;
     
     int length3 = sizeof(int) + 1 + piece_num + sizeof(int);
     char message_id2 = '2';
@@ -214,10 +237,14 @@ void handle_handshake(int connfd, int length) {
     
     // create new thread to listen for request
     pthread_t thread_id;
-    pthread_create(&thread_id, NULL, listen_for_request, NULL);    
+	char* video_prefix = (char*) malloc(video_name.find('.') + 1);
+	memcpy(video_prefix, &video_name, video_name.find('.'));
+	video_prefix[video_name.find('.')] = '\0';
+    pthread_create(&thread_id, NULL, listen_for_request, (void*)video_prefix);    
 }
 
 void *listen_for_request(void *arg) {
+    cout << "listening for request" << endl;
     int listenfd, connfd;
     struct sockaddr_in servaddr;
     char buff;
@@ -260,7 +287,7 @@ void *listen_for_request(void *arg) {
         
         // receive request
 		if (message_id == '3') {
-			reply(connfd);
+			reply(connfd, (char*)arg);
 		}
 	
         close(connfd);
@@ -270,46 +297,55 @@ void *listen_for_request(void *arg) {
     return NULL;
 }
 
-void reply(int connfd) {
-	// receive request   
-	int piece_index, piece_offset, data_len;	
+void reply(int connfd, char* video_prefix) {
+	// receive piece index   
+	int piece_index;	
 	if (recv(connfd, &piece_index, sizeof(int), 0) < 0) {
         printf("send error\n");
         exit(0);
-    }
-
-	if (recv(connfd, &piece_offset, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-
-	if (recv(connfd, &data_len, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
     } 
+	printf("peer requests index %i", piece_index);
 
 	// get data from file;
-	char* data = (char*) malloc (data_len + 1);
-	ostringstream file_name;
-	file_name << piece_index << '_' << piece_offset;
-	FILE* oFile = fopen (file_name.str().c_str(), "rb");
-	if (oFile != NULL) {
-		file_name.str("");
-		file_name << piece_index << ".avi";
-		oFile = fopen (file_name.str().c_str(), "rb");	
-		if (oFile == NULL) {
-			printf("open file %s error\n", file_name.str().c_str());
-       		exit(0);	
+	int data_len;
+
+	ostringstream temp;
+	temp << piece_index;
+	string prefix(video_prefix);
+	string file_name;
+	file_name = prefix + '_' + temp.str() + ".temp";
+	FILE* oFile = fopen (file_name.c_str(), "rb");
+	if (oFile == NULL) {
+		file_name = prefix + ".avi";
+		oFile = fopen (file_name.c_str(), "rb");	
+		fseek (oFile, 0, SEEK_END);
+  		int oFileSize = ftell (oFile);
+		if (oFileSize / BLOCK_SIZE == piece_index) {
+			data_len = oFileSize % BLOCK_SIZE;
+		} else {
+			data_len = BLOCK_SIZE;
 		}
-		fseek (oFile, piece_offset*4194304, SEEK_SET);
+		rewind (oFile);
+		fseek (oFile, piece_index * BLOCK_SIZE, SEEK_SET);
+	} else {
+		fseek (oFile, 0, SEEK_END);
+  		data_len = ftell (oFile);
+		rewind (oFile);
+    }
+	if (oFile == NULL) {
+		printf("open file %s error\n", file_name.c_str());
+       	exit(0);	
 	}
+
+	char* data = (char*) malloc (data_len + 1);		
 	fread(data, 1, data_len, oFile);
 	data[data_len] = '\0';
 	fclose(oFile); 
+	printf("will send file %s, index %i, size %i", file_name.c_str(), piece_index, data_len);
 	
 	// reply
 	char mes_id = '4';
-	int mes_len = 4 + 1 + 4 + 4 + strlen(data);
+	int mes_len = 4 + 1 + 4 + strlen(data);
 	if (send(connfd, &mes_len, sizeof(int), 0) < 0) {
         printf("send error\n");
         exit(0);
@@ -325,15 +361,10 @@ void reply(int connfd) {
         exit(0);
     }
 
-	if (send(connfd, &piece_offset, sizeof(int), 0) < 0) {
-        printf("send error\n");
-        exit(0);
-    }
-
 	if (send(connfd, data, strlen(data), 0) < 0) {
         printf("send error\n");
         exit(0);
     }
 
-	printf("Reply in connfd%i, index:%i, offset:%i", connfd, piece_index, piece_offset);  
+	printf("Sent file %s", file_name.c_str());  
 }
