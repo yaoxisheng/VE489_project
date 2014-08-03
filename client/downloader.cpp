@@ -386,9 +386,8 @@ void *setup_piece_download_conn(void *arg){
 	
 	for (int i = 0; i < ((piece_info*)arg)->index_vec.size(); i++) {
 		request(connfd, ((piece_info*)arg)->index_vec[i]);
+		handle_reply(connfd);
 	}
-
-	handle_reply(connfd);
 	disconnectToServer(connfd);
 	free(((piece_info*)arg)->ip);
 	delete (piece_info*)arg;
