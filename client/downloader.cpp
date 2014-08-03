@@ -20,7 +20,7 @@ const int BLOCK_SIZE = 4*1024*1024;
 const int HASH_OUTPUT_SIZE = 20;
 void handshake(int connfd, char* info_hash);
 void *download_helper(void *arg);
-void get_bitfiled(int port, int &new_port, int id);
+void get_bitfield(int port, int &new_port, int id);
 map<int, vector<int> > bitfield_map;
 pthread_mutex_t map_lock;
 int global_id;
@@ -190,22 +190,30 @@ void *download_helper(void *arg){
 	n = recv(sockfd, &message_id, sizeof(char), 0);
 	printf("message_id is %c\n", message_id);
 
-	// receive bitfiled
+	// receive bitfield
 	int new_port;
-	get_bitfiled(sockfd, new_port, id);
+	get_bitfield(sockfd, new_port, id);
 	
 	free(((ip_info*)arg)->ip);
 	delete ((ip_info*)arg);
 }
 
-void get_bitfiled(int port, int &new_port, int id){
+void get_bitfield(int port, int &new_port, int id){
 	int n, length;
+	char message_id;	
 	n = recv(port, &length, sizeof(int), 0);
-	char* bitfiled = (char*) malloc (length);
-	n = recv(port, bitfiled, length, 0);
+	printf("length is %i\n", length);
+	n = recv(port, &message_id, sizeof(char), 0);
+	char* bitfield = (char*) malloc (length);
+	n = recv(port, bitfield, length-4-1-4, 0);
+	for(int i=0; i<(length-4-4-1); i++){
+		printf("%c",bitfield[i]);	
+	}
+	printf("\n");
 	n = recv(port, &new_port, sizeof(int), 0);
-	for(int i=0; i<length; i++){
-		if(bitfiled[i]){
+	printf("new_port_number is %i\n", new_port);
+	for(int i=0; i<(length-4-1-4); i++){
+		if(bitfield[i]=='1'){
 			pthread_mutex_lock(&map_lock);
 			if(bitfield_map.find(i)==bitfield_map.end()){
 				vector<int> bitfield_vector;
@@ -213,6 +221,7 @@ void get_bitfiled(int port, int &new_port, int id){
 			}		
 			bitfield_map[i].push_back(id);
 			pthread_mutex_unlock(&map_lock);
-		}	
+			printf("piece is %i, id is %i\n", i,id);
+		}
 	}
 }
