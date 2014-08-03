@@ -31,11 +31,10 @@ int connectToServer(char* serverIP, int port) {
         exit(0);
     }
     
-    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
+    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) 	{
         printf("connect error\n");
         exit(0);
     }
-
 	return sockfd;
 }
 
